@@ -1,0 +1,193 @@
+# ----------------------------------------------------------------------------
+# Colors
+
+if [[ $USE_COLORS == "false" ]]; then
+    RED=""
+    GREEN=""
+    BLUE=""
+    YELLOW=""
+    PLAIN=""
+
+    RED_BOLD=""
+    GREEN_BOLD=""
+    BLUE_BOLD=""
+    YELLOW_BOLD=""
+    PLAIN_BOLD=""
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    YELLOW='\033[0;33m'
+    PLAIN='\033[0m'
+
+    RED_BOLD='\033[1;31m'
+    GREEN_BOLD='\033[1;32m'
+    BLUE_BOLD='\033[1;34m'
+    YELLOW_BOLD='\033[1;33m'
+    PLAIN_BOLD='\033[1;37m'
+fi
+
+# ----------------------------------------------------------------------------
+# Utilities
+
+trap ctrl_c INT
+ctrl_c() {
+    tput cnorm
+    if [[ -z $(jobs -p) ]]; then
+        kill $(jobs -p)
+    fi
+    exit
+}
+
+spinner() {
+    spin="\\|/-"
+    i=0
+    tput civis
+    while kill -0 $1 2>/dev/null; do
+        i=$(( (i+1) %4 ))
+        printf "\b${spin:$i:1}"
+        printf "\b"
+        sleep 0.07
+    done
+    tput cnorm
+}
+
+log() {
+    if [[ $SHOW_COMMAND == "true" ]]; then
+        printf "+ "
+        echo "$@"
+    fi
+}
+
+shelp() {
+    COMMAND_SIZE=-40s
+    HELP_SIZE=15s
+    printf " ${BLUE}spock-cli %${COMMAND_SIZE} ${PLAIN}%s\n" "${1}" "${2}"
+}
+
+# ----------------------------------------------------------------------------
+# Parse Args
+
+command=$1
+commandargs=$2
+commandargs2=$3
+
+help=$(
+    printf "${BLUE_BOLD}"
+    printf "┌──────────────────────────────────────────┐\n"
+    printf "│ "
+    printf "${PLAIN_BOLD}"
+    printf "spock-cli - command line tools for spock "
+    printf "${BLUE_BOLD}"
+    printf "│\n"
+    printf "└──────────────────────────────────────────┘\n"
+
+    printf "${PLAIN_BOLD}Meta:\n"
+    shelp "help" "show this help and exit"
+    shelp "update" "update your spock-cli install"
+    shelp "uninstall" "uninstall spock-cli :("
+    printf "${PLAIN_BOLD}Login:\n"
+    shelp "login <staging> <online>" "login to spock app"
+    printf "${PLAIN_BOLD}Templates:\n"
+    shelp "ut <staging> <local> <online>" "update all templates"
+    printf "\n")
+
+
+# ----------------------------------------------------------------------------
+# Meta
+
+if [[ $command == "help" || -z $command ]]; then
+    printf "${help}\n"
+
+# ----------------------------------------------------------------------------
+# Update climate
+
+elif [[ $command == "update" ]]; then
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/leozhang2018/spock-cli/master/install)"
+
+# ----------------------------------------------------------------------------
+# Uninstall spock-cli
+
+elif [[ $command == "uninstall" ]]; then
+    sudo rm /usr/bin/spock-cli -rf
+    sudo rm /usr/local/bin/spock-cli -rf
+    printf "Uninstalling spock-cli: "
+    if [[ -f /usr/bin/spock-cli ]] ; then
+        printf "${RED_BOLD}Failed${PLAIN}"
+    else
+        printf "${GREEN_BOLD}Success${PLAIN}\n"
+    fi
+    printf "\n"
+
+# ----------------------------------------------------------------------------
+# Display version and credits
+
+elif [[ $command == "version" ]]; then
+    printf "${BLUE_BOLD}spock-cli${PLAIN} v0.1\n\n"
+    printf "${PLAIN}Copyright (C) 2016  Leozhang2018\n\n"
+
+# ----------------------------------------------------------------------------
+# spock login
+
+elif [[ $command == "login" ]]; then
+    if [[ $commandargs == "staging" ]]; then
+    SPOCK_AK_STAGING=`sed '/^SPOCK_AK_STAGING=/!d;s/.*=//' $GLOBAL_CONF`
+    SPOCK_SK_STAGING=`sed '/^SPOCK_SK_STAGING=/!d;s/.*=//' $GLOBAL_CONF`
+    STAGING_COOKIE=`sed '/^STAGING_COOKIE=/!d;s/.*=//' $GLOBAL_CONF`
+    kirk login --ak $SPOCK_AK_STAGING --sk $SPOCK_SK_STAGING
+    fi
+
+    if [[ $commandargs == "online" ]]; then
+    SPOCK_AK_ONLINE=`sed '/^SPOCK_AK_ONLINE=/!d;s/.*=//' $GLOBAL_CONF`
+    SPOCK_SK_ONLINE=`sed '/^SPOCK_SK_ONLINE=/!d;s/.*=//' $GLOBAL_CONF`
+    kirk login --ak $SPOCK_AK_ONLINE --sk $SPOCK_SK_ONLINE
+    fi
+
+# ----------------------------------------------------------------------------
+# spock ps
+
+elif [[ $command == "ps" ]]; then
+    kirk ps
+
+# ----------------------------------------------------------------------------
+# spock update template
+
+elif [[ $command == "ut" ]]; then
+  HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
+
+  if [[ $commandargs == "staging" ]]; then
+  COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+  HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+  fi
+
+  if [[ $commandargs == "online" ]]; then
+  COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+  HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+  fi
+
+  if [[ $commandargs == "local" ]]; then
+  COOKIE=`sed '/^LOCAL_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+  HOST=`sed '/^LOCAL_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+  fi
+
+  find  $HACK_FOLDER -name "*-template.json" > /tmp/spock-cli-`date +%s`.tmp
+  for line in $(awk '{print $0}' /tmp/spock-cli-`date +%s`.tmp)
+  do
+      arr[$i]=$line
+      i=$(expr $i + 1)
+  done
+
+  #define json array
+  for conf in ${arr[@]}
+  do
+  curl -X POST -v -d @$conf -H "Cookie:$COOKIE" ${HOST}"/api/spock/templates"
+  done
+
+# ----------------------------------------------------------------------------
+# Welp, we don't know this command
+
+elif [[ $command != "" ]]; then
+    printf "${help}\n\n"
+    printf "${RED_BOLD}Error: '${command}' command not available\n"
+fi
+# ----------------------------------------------------------------------------

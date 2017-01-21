@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+
+# ----------------------------------------------------------------------------
+# Colors
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+PLAIN='\033[0m'
+
+RED_BOLD='\033[1;31m'
+GREEN_BOLD='\033[1;32m'
+BLUE_BOLD='\033[1;34m'
+YELLOW_BOLD='\033[1;33m'
+PLAIN_BOLD='\033[1;37m'
+
+# ----------------------------------------------------------------------------
+# Utilities
+
+trap ctrl_c INT
+ctrl_c() {
+    tput cnorm
+    exit
+}
+
+spinner() {
+    local spin="\\|/-"
+    local i=0
+    tput civis
+    while kill -0 "$1" 2>/dev/null; do
+        i=$(( (i+1) %4 ))
+        printf "\b%s" "${spin:$i:1}"
+        sleep 0.07
+    done
+    tput cnorm
+}
+
+yesno() {
+    while true; do
+        printf "${BLUE}"
+        printf " • $1 "
+
+        if [[ $2 == "no" ]]; then
+            printf "${PLAIN}[yes | ${GREEN_BOLD}no${PLAIN}] "
+            read ans
+            if [[ -z "$ans" ]]; then
+                ans="no"
+            fi
+        else
+            printf "${PLAIN}[${GREEN_BOLD}yes${PLAIN} | no] "
+            read ans
+            if [[ -z "$ans" ]]; then
+                ans="yes"
+            fi
+        fi
+
+        if [[ $ans == "yes" ]] || [[ $ans == "y" ]]; then
+            return 0
+        elif [[ $ans == "no" ]] || [[ $ans == "n" ]]; then
+            return 1
+        else
+            printf "   ${RED}Invalid answer. Please answer with 'yes' or 'no'."
+        fi
+    done
+}
+
+ask() {
+    printf "${PLAIN} • ${BLUE}$2 "
+
+    printf "${PLAIN}[${GREEN_BOLD}$3${PLAIN}] "
+
+    read ans
+    if [[ -z "$ans" ]]; then
+        ans="$3"
+    fi
+
+    eval "$1='"$ans"'"
+}
+
+command_exists () {
+    type "$1" &> /dev/null
+}
+
+system_verify() {
+    if ! command_exists $1; then
+        printf "${PLAIN} • ${RED}$1 missing.${PLAIN} "
+
+        if command_exists apt-get || command_exists yum || command_exists dnf; then
+            printf "Installing...  "
+
+            if command_exists dnf && [[ "$3" != "-" ]]; then
+                sudo dnf install -y "$3"  > /dev/null 2>&1 &
+                spinner $!
+                printf "\b${GREEN}Installed!"
+
+            elif command_exists yum && [[ "$3" != "-" ]]; then
+                sudo yum install -y "$3"  > /dev/null 2>&1 &
+                spinner $!
+                printf "\b${GREEN}Installed!"
+
+            elif command_exists apt-get && [[ "$2" != "-" ]]; then
+                sudo apt-get install -y "$2"  > /dev/null 2>&1 &
+                spinner $!
+                printf "\b${GREEN}Installed!"
+
+            else
+                printf "${RED}Package doesn't exist for your arch. Please install it manually."
+            fi
+
+        else
+            printf "Please install it manually."
+        fi
+    else
+        printf "${PLAIN} • ${GREEN}$1 exists!${PLAIN}"
+    fi
+    printf "\n"
+}
+
+
+main() {
+    INSTALL_DIR=/usr/local/bin
+    if [[ ! -z "$1" ]]; then
+        INSTALL_DIR="$1"
+    fi
+
+    if [[ ! -w "$INSTALL_DIR" ]]; then
+        printf "${RED_BOLD}Error: must be root to install.${PLAIN}\n"
+        exit
+    fi
+
+    printf "${RED_BOLD}"
+    printf "┌─────────────────────┐\n"
+    printf "│ "
+    printf "${PLAIN_BOLD}"
+    printf "spock-cli installer "
+    printf "${RED_BOLD}"
+    printf "│\n"
+    printf "└─────────────────────┘\n"
+
+    if [[ ! -f "spock-cli" ]]; then
+        printf "Downloading...  "
+        system_verify "git" "git-all" "git-all"
+        git clone https://github.com/leozhang2018/spock-cli.git --depth=1 > /dev/null 2>&1 &
+        spinner $!
+        cd spock-cli
+    fi
+
+    CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+    printf "\n${PLAIN}Alright, let's get started with a few questions. Just press enter if you want to use the ${GREEN_BOLD}default value.\n\n"
+
+    printf "   ${RED}RED "
+    printf "${GREEN}GREEN "
+    printf "${BLUE}BLUE "
+    printf "${YELLOW}YELLOW "
+    printf "${PLAIN}PLAIN\n"
+    ask GLOBAL_CONF "Glocal conf path?"
+    SPOCK_CLI_EXEC="spock-cli"
+    SPOCK_CLI_SRC=$INSTALL_DIR/$SPOCK_CLI_EXEC
+    printf "#!/usr/bin/env bash\n\n" > $SPOCK_CLI_SRC
+    printf "GLOBAL_CONF=${GLOBAL_CONF}\n" >> $SPOCK_CLI_SRC
+    printf "\n" >> $SPOCK_CLI_SRC
+    tail -n +3 "$CUR_DIR/spock-cli" >> $SPOCK_CLI_SRC
+    chmod +x $SPOCK_CLI_SRC
+
+    printf "\nGreat. Now, let's check if you have the all requirements:\n\n"
+
+    #             command      Debian based    RPM based
+    system_verify "curl"            "curl"          "curl"
+
+    printf "\nNeat! You're all set. Run 'climate' to see the whole list "
+    printf "of commands supported. Enjoy!${PLAIN}\n"
+}
+
+main $@
