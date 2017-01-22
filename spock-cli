@@ -89,7 +89,8 @@ help=$(
     printf "${PLAIN_BOLD}Login:\n"
     shelp "login <env>" "login to spock app"
     printf "${PLAIN_BOLD}Product:\n"
-    shelp "cp <product name> <env>" "create product on specified env"
+    shelp "cp <product name> <env>"  "create product on specified env"
+    shelp "del <product name> <env>" "delete product on specified env"
     printf "${PLAIN_BOLD}Templates:\n"
     shelp "ut <env>" "update all templates"
     printf "\n")
@@ -187,7 +188,34 @@ elif [[ $command == "cp" ]]; then
 
   fi
 
+# ----------------------------------------------------------------------------
+# delete product
 
+elif [[ $command == "del" ]]; then
+    if [[ $commandargs2 != "" ]]; then
+        printf "${BLUE_BOLD} Deleting Product $commandargs2 \n\n"
+
+        if [[ $commandargs == "staging" ]]; then
+        HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+        COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+        fi
+
+        if [[ $commandargs == "online" ]]; then
+        HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+        COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+        fi
+
+        TIMESTAMP=`date +%s`
+
+        curl ${HOST}/api/spock/products/$commandargs2 -X DELETE -H 'Accept: application/json, text/plain, */*' -H 'Content-Type: application/json;charset=utf-8' -H "Cookie:$COOKIE" -s >> /tmp/spock-cli-create-$commandargs2-`date +%s`.log
+        printf "${PLAIN}\n"
+        if [ -f $LOG_FILE ]; then
+        printf "${YELLOW_BOLD}Result:\n"
+        cat $LOG_FILE
+        exit
+        fi
+
+  fi
 
 # ----------------------------------------------------------------------------
 # spock ps
@@ -199,7 +227,7 @@ elif [[ $command == "ps" ]]; then
 # spock update template
 
 elif [[ $command == "ut" ]]; then
-  if [[ $commandargs2 != "" ]]; then
+  if [[ $commandargs != "" ]]; then
       HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
 
       if [[ $commandargs == "staging" ]]; then
