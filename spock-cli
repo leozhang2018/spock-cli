@@ -87,10 +87,23 @@ help=$(
     shelp "update" "update your spock-cli install"
     shelp "uninstall" "uninstall spock-cli :("
     printf "${PLAIN_BOLD}Login:\n"
-    shelp "login <staging> <online>" "login to spock app"
+    shelp "login <env>" "login to spock app"
+    printf "${PLAIN_BOLD}Product:\n"
+    shelp "cp <product name> <env>" "create product on specified env"
     printf "${PLAIN_BOLD}Templates:\n"
-    shelp "ut <staging> <local> <online>" "update all templates"
+    shelp "ut <env>" "update all templates"
     printf "\n")
+
+
+# ----------------------------------------------------------------------------
+#Program start
+
+HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
+if [[ $GLOBAL_CONF == "" ]]; then
+    printf "${RED_BOLD}Error: Please Re-install and specify spock-cli.conf file path"
+
+    exit 0
+fi
 
 
 # ----------------------------------------------------------------------------
@@ -100,7 +113,7 @@ if [[ $command == "help" || -z $command ]]; then
     printf "${help}\n"
 
 # ----------------------------------------------------------------------------
-# Update climate
+# Update spock-cli
 
 elif [[ $command == "update" ]]; then
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/leozhang2018/spock-cli/master/install)"
@@ -144,6 +157,39 @@ elif [[ $command == "login" ]]; then
     fi
 
 # ----------------------------------------------------------------------------
+# create product
+
+elif [[ $command == "cp" ]]; then
+    JSON=$HACK_FOLDER"/create-product-$commandargs2.json"
+    if [[ $commandargs2 != "" ]]; then
+        printf "${BLUE_BOLD} Creating Product $commandargs2 \n\n"
+        if [[ $commandargs == "staging" ]]; then
+        HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+        COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+        fi
+
+        if [[ $commandargs == "online" ]]; then
+        HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+        COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+        fi
+
+        TIMESTAMP=`date +%s`
+
+        printf "${PLAIN}\n"
+        curl -v -d @"$JSON" -H 'Content-Type: application/json;charset=UTF-8' -H "Cookie:$COOKIE" ${HOST}"/api/spock/products" -s >> /tmp/spock-cli-create-$commandargs2-`date +%s`.log
+        LOG_FILE=/tmp/spock-cli-create-$commandargs2-$TIMESTAMP.log
+
+        if [ -f $LOG_FILE ]; then
+        printf "${YELLOW_BOLD}Result:\n"
+        cat $LOG_FILE
+        exit
+        fi
+
+  fi
+
+
+
+# ----------------------------------------------------------------------------
 # spock ps
 
 elif [[ $command == "ps" ]]; then
@@ -153,35 +199,37 @@ elif [[ $command == "ps" ]]; then
 # spock update template
 
 elif [[ $command == "ut" ]]; then
-  HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
+  if [[ $commandargs2 != "" ]]; then
+      HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
 
-  if [[ $commandargs == "staging" ]]; then
-  COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
-  HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+      if [[ $commandargs == "staging" ]]; then
+      COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+      HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+      fi
+
+      if [[ $commandargs == "online" ]]; then
+      COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+      HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+      fi
+
+      if [[ $commandargs == "local" ]]; then
+      COOKIE=`sed '/^LOCAL_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
+      HOST=`sed '/^LOCAL_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
+      fi
+
+      find  $HACK_FOLDER -name "*-template.json" > /tmp/spock-cli-`date +%s`.tmp
+      for line in $(awk '{print $0}' /tmp/spock-cli-`date +%s`.tmp)
+      do
+          arr[$i]=$line
+          i=$(expr $i + 1)
+      done
+
+      #define json array
+      for conf in ${arr[@]}
+      do
+      curl -v -d @$conf -H "Cookie:$COOKIE" ${HOST}"/api/spock/templates"
+      done
   fi
-
-  if [[ $commandargs == "online" ]]; then
-  COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
-  HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
-  fi
-
-  if [[ $commandargs == "local" ]]; then
-  COOKIE=`sed '/^LOCAL_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
-  HOST=`sed '/^LOCAL_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
-  fi
-
-  find  $HACK_FOLDER -name "*-template.json" > /tmp/spock-cli-`date +%s`.tmp
-  for line in $(awk '{print $0}' /tmp/spock-cli-`date +%s`.tmp)
-  do
-      arr[$i]=$line
-      i=$(expr $i + 1)
-  done
-
-  #define json array
-  for conf in ${arr[@]}
-  do
-  curl -X POST -v -d @$conf -H "Cookie:$COOKIE" ${HOST}"/api/spock/templates"
-  done
 
 # ----------------------------------------------------------------------------
 # Welp, we don't know this command

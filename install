@@ -169,7 +169,7 @@ main() {
     #             command      Debian based    RPM based
     system_verify "curl"            "curl"          "curl"
 
-    printf "\nNeat! You're all set. Run 'climate' to see the whole list "
+    printf "\nNeat! You're all set. Run 'spock-cli' to see the whole list "
     printf "of commands supported. Enjoy!${PLAIN}\n"
 }
 
