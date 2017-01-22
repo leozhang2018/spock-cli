@@ -99,11 +99,13 @@ help=$(
 # ----------------------------------------------------------------------------
 #Program start
 
-HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
 if [[ $GLOBAL_CONF == "" ]]; then
     printf "${RED_BOLD}Error: Please Re-install and specify spock-cli.conf file path"
-
     exit 0
+fi
+
+if [[ $GLOBAL_CONF != "" ]]; then
+    HACK_FOLDER=`sed '/^HACK_FOLDER=/!d;s/.*=//' $GLOBAL_CONF`
 fi
 
 
@@ -161,15 +163,15 @@ elif [[ $command == "login" ]]; then
 # create product
 
 elif [[ $command == "cp" ]]; then
-    JSON=$HACK_FOLDER"/create-product-$commandargs2.json"
+    JSON=$HACK_FOLDER"/create-product-$commandargs.json"
     if [[ $commandargs2 != "" ]]; then
-        printf "${BLUE_BOLD} Creating Product $commandargs2 \n\n"
-        if [[ $commandargs == "staging" ]]; then
+        printf "${BLUE_BOLD} Creating Product $commandargs \n\n"
+        if [[ $commandargs2 == "staging" ]]; then
         HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
         COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
         fi
 
-        if [[ $commandargs == "online" ]]; then
+        if [[ $commandargs2 == "online" ]]; then
         HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
         COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
         fi
@@ -193,27 +195,22 @@ elif [[ $command == "cp" ]]; then
 
 elif [[ $command == "del" ]]; then
     if [[ $commandargs2 != "" ]]; then
-        printf "${BLUE_BOLD} Deleting Product $commandargs2 \n\n"
+        printf "${BLUE_BOLD} Deleting Product $commandargs \n\n"
 
-        if [[ $commandargs == "staging" ]]; then
+        if [[ $commandargs2 == "staging" ]]; then
         HOST=`sed '/^STAGING_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
         COOKIE=`sed '/^STAGING_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
         fi
 
-        if [[ $commandargs == "online" ]]; then
+        if [[ $commandargs2 == "online" ]]; then
         HOST=`sed '/^ONLINE_HOST=/!d;s/.*=//' $GLOBAL_CONF|sed 's/"//g'`
         COOKIE=`sed '/^ONLINE_COOKIE:/!d;s/.*://' $GLOBAL_CONF|sed 's/"//g'`
         fi
 
-        TIMESTAMP=`date +%s`
 
-        curl ${HOST}/api/spock/products/$commandargs2 -X DELETE -H 'Accept: application/json, text/plain, */*' -H 'Content-Type: application/json;charset=utf-8' -H "Cookie:$COOKIE" -s >> /tmp/spock-cli-create-$commandargs2-`date +%s`.log
-        printf "${PLAIN}\n"
-        if [ -f $LOG_FILE ]; then
+        curl ${HOST}/api/spock/products/$commandargs -X DELETE -H 'Accept: application/json, text/plain, */*' -H 'Content-Type: application/json;charset=utf-8' -H "Cookie:$COOKIE"
         printf "${YELLOW_BOLD}Result:\n"
-        cat $LOG_FILE
         exit
-        fi
 
   fi
 
